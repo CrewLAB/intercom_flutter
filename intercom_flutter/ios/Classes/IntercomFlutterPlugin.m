@@ -3,6 +3,11 @@
 
 id unread;
 
+@interface IntercomFlutterPlugin ()
+- (void)ensureIntercomWindowReceivesTouches;
+- (void)enableUserInteractionRecursively:(UIView *)view;
+@end
+
 @implementation UnreadStreamHandler
 - (FlutterError*)onListenWithArguments:(id)arguments eventSink:(FlutterEventSink)eventSink {
     unread = [[NSNotificationCenter defaultCenter] addObserverForName:IntercomUnreadConversationCountDidChangeNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
@@ -30,7 +35,7 @@ id unread;
     UnreadStreamHandler* unreadStreamHandler =
         [[UnreadStreamHandler alloc] init];
     [unreadChannel setStreamHandler:unreadStreamHandler];
-    
+
 }
 
 - (void) handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result{
@@ -48,7 +53,7 @@ id unread;
             // Handle error
             NSInteger errorCode = error.code;
             NSString *errorMsg = error.localizedDescription;
-            
+
             result([FlutterError errorWithCode:[@(errorCode) stringValue]
                                        message:errorMsg
                                        details: [self getIntercomError:errorCode:errorMsg]]);
@@ -78,7 +83,7 @@ id unread;
             // Handle failure
             NSInteger errorCode = error.code;
             NSString *errorMsg = error.localizedDescription;
-            
+
             result([FlutterError errorWithCode:[@(errorCode) stringValue]
                                        message:errorMsg
                                        details: [self getIntercomError:errorCode:errorMsg]]);
@@ -95,7 +100,7 @@ id unread;
             // Handle failure
             NSInteger errorCode = error.code;
             NSString *errorMsg = error.localizedDescription;
-            
+
             result([FlutterError errorWithCode:[@(errorCode) stringValue]
                                        message:errorMsg
                                        details: [self getIntercomError:errorCode:errorMsg]]);
@@ -129,11 +134,11 @@ id unread;
     }
     else if([@"displayHelpCenterCollections" isEqualToString:call.method]) {
         NSArray *collectionIds = call.arguments[@"collectionIds"];
-        if(collectionIds != (id)[NSNull null] && collectionIds != nil) {
-            [Intercom presentContent:[IntercomContent helpCenterCollectionsWithIds:collectionIds]];
-        } else {
-            [Intercom presentContent:[IntercomContent helpCenterCollectionsWithIds:@[]]];
-        }
+        NSArray *ids = (collectionIds != (id)[NSNull null] && collectionIds != nil) ? collectionIds : @[];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [Intercom presentContent:[IntercomContent helpCenterCollectionsWithIds:ids]];
+            [self ensureIntercomWindowReceivesTouches];
+        });
         result(@"Presented help center collections");
     }
     else if([@"displayMessages" isEqualToString:call.method]) {
@@ -148,7 +153,7 @@ id unread;
             // Handle failure
             NSInteger errorCode = error.code;
             NSString *errorMsg = error.localizedDescription;
-            
+
             result([FlutterError errorWithCode:[@(errorCode) stringValue]
                                        message:errorMsg
                                        details: [self getIntercomError:errorCode:errorMsg]]);
@@ -190,7 +195,7 @@ id unread;
                 // Handle failure
                 NSInteger errorCode = error.code;
                 NSString *errorMsg = error.localizedDescription;
-                
+
                 result([FlutterError errorWithCode:[@(errorCode) stringValue]
                                            message:errorMsg
                                            details: [self getIntercomError:errorCode:errorMsg]]);
@@ -200,19 +205,28 @@ id unread;
         NSString *articleId = call.arguments[@"articleId"];
         NSLog(@"%@", articleId);
         if(articleId != (id)[NSNull null] && articleId != nil) {
-            [Intercom presentContent:[IntercomContent articleWithId:articleId]];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [Intercom presentContent:[IntercomContent articleWithId:articleId]];
+                [self ensureIntercomWindowReceivesTouches];
+            });
             result(@"displaying article");
         }
     } else if([@"displayCarousel" isEqualToString:call.method]) {
         NSString *carouselId = call.arguments[@"carouselId"];
         if(carouselId != (id)[NSNull null] && carouselId != nil) {
-            [Intercom presentContent:[IntercomContent carouselWithId:carouselId]];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [Intercom presentContent:[IntercomContent carouselWithId:carouselId]];
+                [self ensureIntercomWindowReceivesTouches];
+            });
             result(@"displaying carousel");
         }
     } else if([@"displaySurvey" isEqualToString:call.method]) {
         NSString *surveyId = call.arguments[@"surveyId"];
         if(surveyId != (id)[NSNull null] && surveyId != nil) {
-            [Intercom presentContent:[IntercomContent surveyWithId:surveyId]];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [Intercom presentContent:[IntercomContent surveyWithId:surveyId]];
+                [self ensureIntercomWindowReceivesTouches];
+            });
             result(@"displaying survey");
         }
     } else if([@"isIntercomPush" isEqualToString:call.method]) {
@@ -229,7 +243,10 @@ id unread;
     } else if([@"displayConversation" isEqualToString:call.method]) {
         NSString *conversationId = call.arguments[@"conversationId"];
         if(conversationId != (id)[NSNull null] && conversationId != nil) {
-            [Intercom presentContent:[IntercomContent conversationWithId:conversationId]];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [Intercom presentContent:[IntercomContent conversationWithId:conversationId]];
+                [self ensureIntercomWindowReceivesTouches];
+            });
             result(@"displaying conversation");
         }
     } else if([@"displayTickets" isEqualToString:call.method]) {
@@ -249,10 +266,10 @@ id unread;
         if(data != (id)[NSNull null]){
             NSDictionary *attributes = data.attributes;
             NSMutableDictionary<NSString *, id> *map = [attributes mutableCopy];
-            
+
             // Add custom attributes
             map[@"custom_attributes"] = data.customAttributes;
-           
+
             // Add companies
             if (data.companies) {
                 NSMutableArray *companiesArray = [NSMutableArray array];
@@ -261,7 +278,7 @@ id unread;
                 }
                 map[@"companies"] = companiesArray;
             }
-            
+
             result(map);
         }
         result([NSMutableDictionary dictionary]);
@@ -279,7 +296,7 @@ id unread;
                 // Handle failure
                 NSInteger errorCode = error.code;
                 NSString *errorMsg = error.localizedDescription;
-                
+
                 result([FlutterError errorWithCode:[@(errorCode) stringValue]
                                            message:errorMsg
                                            details: [self getIntercomError:errorCode:errorMsg]]);
@@ -287,7 +304,7 @@ id unread;
         }
     } else if([@"setThemeMode" isEqualToString:call.method]) {
         NSString *theme = call.arguments[@"theme"];
-        
+
         if([@"dark" isEqualToString:theme]){
             [Intercom setThemeOverride:ICMThemeOverrideDark];
         } else if([@"light" isEqualToString:theme]){
@@ -308,7 +325,7 @@ id unread;
     NSMutableDictionary *details = [NSMutableDictionary dictionary];
     [details setObject:[NSNumber numberWithInteger:errorCode]  forKey: @"errorCode"];
     [details setObject: errorMessage forKey:  @"errorMessage"];
-    
+
     return details;
 }
 
@@ -342,17 +359,17 @@ id unread;
     if(customAttributes != (id)[NSNull null]) {
         attributes.customAttributes = customAttributes;
     }
-    
+
     NSNumber *signedUpAt = call.arguments[@"signedUpAt"];
     if(signedUpAt != (id)[NSNull null]) {
         attributes.signedUpAt = [NSDate dateWithTimeIntervalSince1970: signedUpAt.doubleValue];
     }
-    
+
     NSString *language = call.arguments[@"language"];
     if(language != (id)[NSNull null]) {
         attributes.languageOverride = language;
     }
-    
+
     return attributes;
 }
 
@@ -390,5 +407,48 @@ id unread;
 
     NSData *a = [[NSData alloc] initWithBytesNoCopy:outBytes length:o freeWhenDone:YES];
     return a;
+}
+
+- (void)ensureIntercomWindowReceivesTouches {
+    // Fix for iOS 26+ touch handling issues with Flutter apps.
+    // Intercom presents its UI in a separate window which may not receive
+    // touch events properly due to Flutter's window hierarchy on iOS 26+.
+    // This ensures the Intercom window is at the correct level and can receive touches.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        NSArray<UIWindow *> *windows;
+        if (@available(iOS 15.0, *)) {
+            NSSet<UIScene *> *scenes = [[UIApplication sharedApplication] connectedScenes];
+            for (UIScene *scene in scenes) {
+                if ([scene isKindOfClass:[UIWindowScene class]]) {
+                    UIWindowScene *windowScene = (UIWindowScene *)scene;
+                    windows = windowScene.windows;
+                    break;
+                }
+            }
+        } else {
+            windows = [[UIApplication sharedApplication] windows];
+        }
+
+        for (UIWindow *window in windows) {
+            NSString *className = NSStringFromClass([window class]);
+            // Intercom uses windows with class names containing "Intercom"
+            if ([className containsString:@"Intercom"] ||
+                [className containsString:@"ICM"]) {
+                // Ensure the window is above Flutter's window and can receive touches
+                window.windowLevel = UIWindowLevelAlert + 1;
+                window.userInteractionEnabled = YES;
+                // Make sure all subviews can receive touches
+                [self enableUserInteractionRecursively:window];
+                break;
+            }
+        }
+    });
+}
+
+- (void)enableUserInteractionRecursively:(UIView *)view {
+    view.userInteractionEnabled = YES;
+    for (UIView *subview in view.subviews) {
+        [self enableUserInteractionRecursively:subview];
+    }
 }
 @end
